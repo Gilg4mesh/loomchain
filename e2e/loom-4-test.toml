@@ -101,7 +101,7 @@
 
 # BinanceChain. Since Binance generates private key using secp256k1 as same as Eth, we can run the test with EthAccountPrivKeyPathList.
 [[TestCases]]
-  RunCmd = "{{ $.LoomPath }} addressmapper add-identity-mapping default:{{index $.AccountAddressList 2}} {{index $.EthAccountPrivKeyPathList 1}} -c binance -k {{index $.AccountPrivKeyPathList 2}}"
+  RunCmd = "{{ $.LoomPath }} addressmapper add-identity-mapping default:{{index $.AccountAddressList 2}} {{index $.EthAccountPrivKeyPathList 2}} -c binance -k {{index $.AccountPrivKeyPathList 2}}"
   Condition = "contains"
   Expected = [ "mapping successful" ]
 
@@ -111,7 +111,7 @@
   Expected = [ "mappings", '"chainId": "default"', '"chainId": "binance"' ]
 
  [[TestCases]]
-  RunCmd = "{{ $.LoomPath }} deploy -b SimpleStore.bin -n SimpleStoreBinance --algo secp256k1 --chain default --caller-chain binance -k {{index $.EthAccountPrivKeyPathList 1}}"
+  RunCmd = "{{ $.LoomPath }} deploy -b SimpleStore.bin -n SimpleStoreBinance --algo secp256k1 --chain default --caller-chain binance -k {{index $.EthAccountPrivKeyPathList 2}}"
   Condition = "contains"
   Expected = [ "New contract deployed with address: "  ]
   Datafiles = [
@@ -119,7 +119,7 @@
   ]
 
  [[TestCases]]
-  RunCmd = "{{ $.LoomPath }} callevm -i inputSet987.bin -n SimpleStoreBinance --algo secp256k1 --chain default --caller-chain binance -k {{index $.EthAccountPrivKeyPathList 1}}"
+  RunCmd = "{{ $.LoomPath }} callevm -i inputSet987.bin -n SimpleStoreBinance --algo secp256k1 --chain default --caller-chain binance -k {{index $.EthAccountPrivKeyPathList 2}}"
   Condition = "contains"
   Expected = [ "Call response: " ]
   Datafiles = [ { Filename = "inputSet987.bin", Contents = "60fe47b100000000000000000000000000000000000000000000000000000000000003db" } ]
