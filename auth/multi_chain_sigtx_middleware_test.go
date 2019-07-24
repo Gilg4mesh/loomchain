@@ -130,6 +130,44 @@ func TestTronSigning(t *testing.T) {
 	require.True(t, bytes.Equal(ethLocalAdr, ethLocalAdr2))
 }
 
+func TestBinanceSigning(t *testing.T) {
+	privateKey, err := crypto.HexToECDSA(ethPrivateKey)
+	require.NoError(t, err)
+	signer := auth.NewSecp256k1Signer(crypto.FromECDSA(privateKey))
+	publicKey := signer.PublicKey()
+	require.NoError(t, err)
+	to := contract
+	nonce := uint64(7)
+
+	// Encode
+	nonceTx := []byte("nonceTx")
+	foreignLocalAddr, err := loom.LocalAddressFromHexString(evmcompat.BitcoinAddress(publicKey).Hex())
+	require.NoError(t, err)
+	hash := sha3.SoliditySHA3(
+		sha3.Address(common.BytesToAddress(foreignLocalAddr)),
+		sha3.Address(common.BytesToAddress(to.Local)),
+		sha3.Uint64(nonce),
+		nonceTx,
+	)
+
+	signature, err := evmcompat.GenerateTypedSig(hash, privateKey, evmcompat.SignatureType_BINANCE)
+	require.NoError(t, err)
+
+	tx := &auth.SignedTx{
+		Inner:     nonceTx,
+		Signature: signature,
+		PublicKey: publicKey,
+	}
+
+	// Decode
+	recoverdAddr, err := evmcompat.RecoverAddressFromTypedSig(hash, tx.Signature)
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(recoverdAddr.Bytes(), foreignLocalAddr))
+
+	signatureNoRecoverID := signature[1 : len(tx.Signature)-1] // remove recovery ID
+	require.True(t, crypto.VerifySignature(tx.PublicKey, hash, signatureNoRecoverID))
+}
+
 func TestEthAddressMappingVerification(t *testing.T) {
 	state := loomchain.NewStoreState(nil, store.NewMemStore(), abci.Header{ChainID: defaultLoomChainId}, nil, nil)
 	fakeCtx := goloomplugin.CreateFakeContext(addr1, addr1)
@@ -145,10 +183,6 @@ func TestEthAddressMappingVerification(t *testing.T) {
 		},
 		"eth": {
 			TxType:      EthereumSignedTxType,
-			AccountType: MappedAccountType,
-		},
-		"tron": {
-			TxType:      TronSignedTxType,
 			AccountType: MappedAccountType,
 		},
 	}
@@ -193,6 +227,72 @@ func TestEthAddressMappingVerification(t *testing.T) {
 
 	// tx using address mapping from eth account. No error this time as mapped loom account is found.
 	txSigned = mockSignedTx(t, "eth", &auth.EthSigner66Byte{ethKey})
+	_, err = throttleMiddlewareHandler(tmx, state, txSigned, ctx)
+	require.NoError(t, err)
+}
+
+func TestBinancesAddressMappingVerification(t *testing.T) {
+	state := loomchain.NewStoreState(nil, store.NewMemStore(), abci.Header{ChainID: defaultLoomChainId}, nil, nil)
+	fakeCtx := goloomplugin.CreateFakeContext(addr1, addr1)
+	addresMapperAddr := fakeCtx.CreateContract(address_mapper.Contract)
+	amCtx := contractpb.WrapPluginContext(fakeCtx.WithAddress(addresMapperAddr))
+
+	ctx := context.WithValue(state.Context(), ContextKeyOrigin, origin)
+
+	chains := map[string]ChainConfig{
+		"default": {
+			TxType:      LoomSignedTxType,
+			AccountType: NativeAccountType,
+		},
+		"binance": {
+			TxType:      BinanceSignedTxType,
+			AccountType: MappedAccountType,
+		},
+	}
+	tmx := NewMultiChainSignatureTxMiddleware(
+		chains,
+		func(state loomchain.State) (contractpb.StaticContext, error) { return amCtx, nil },
+	)
+
+	// Normal loom transaction without address mapping
+	txSigned := mockEd25519SignedTx(t, priKey1)
+	_, err := throttleMiddlewareHandler(tmx, state, txSigned, ctx)
+	require.NoError(t, err)
+
+	// Init the contract
+	am := address_mapper.AddressMapper{}
+	require.NoError(t, am.Init(amCtx, &address_mapper.InitRequest{}))
+
+	// generate eth key
+	// ethKey, err := crypto.GenerateKey()
+	privKey, err := crypto.HexToECDSA(ethPrivateKey)
+	require.NoError(t, err)
+	signer := auth.NewBinanceSigner(crypto.FromECDSA(privKey))
+	foreignLocalAddr, err := loom.LocalAddressFromHexString(evmcompat.BitcoinAddress(signer.PublicKey()).Hex())
+	require.NoError(t, err)
+	foreignPublicAddr := loom.Address{ChainID: "binance", Local: foreignLocalAddr}
+
+	// tx using address mapping from eth account. Gives error.
+	txSigned = mockBinanceSignedTx(t, "binance", signer)
+	_, err = throttleMiddlewareHandler(tmx, state, txSigned, ctx)
+	require.Error(t, err)
+
+	// set up address mapping between eth and loom accounts
+	sig, err := address_mapper.SignIdentityMapping(addr1, foreignPublicAddr, privKey)
+	require.NoError(t, err)
+	// make sig type to binance
+	typedSig := append(make([]byte, 0, 66), byte(evmcompat.SignatureType_BINANCE))
+	sig = append(typedSig, sig[1:]...)
+	mapping := amtypes.AddressMapperAddIdentityMappingRequest{
+		From:      addr1.MarshalPB(),
+		To:        foreignPublicAddr.MarshalPB(),
+		Signature: sig,
+	}
+	mapping = mapping
+	require.NoError(t, am.AddIdentityMapping(amCtx, &mapping))
+
+	// tx using address mapping from binance account. No error this time as mapped loom account is found.
+	txSigned = mockBinanceSignedTx(t, "binance", signer)
 	_, err = throttleMiddlewareHandler(tmx, state, txSigned, ctx)
 	require.NoError(t, err)
 }
@@ -307,6 +407,17 @@ func mockSignedTx(t *testing.T, chainID string, signer auth.Signer) []byte {
 	ethLocalAdr, err := loom.LocalAddressFromHexString(crypto.PubkeyToAddress(*privateKey).Hex())
 	require.NoError(t, err)
 	nonceTx := mockNonceTx(t, loom.Address{ChainID: chainID, Local: ethLocalAdr}, sequence)
+
+	signedTx := auth.SignTx(signer, nonceTx)
+	marshalledSignedTx, err := proto.Marshal(signedTx)
+	require.NoError(t, err)
+	return marshalledSignedTx
+}
+
+func mockBinanceSignedTx(t *testing.T, chainID string, signer auth.Signer) []byte {
+	foreignLocalAddr, err := loom.LocalAddressFromHexString(evmcompat.BitcoinAddress(signer.PublicKey()).Hex())
+	require.NoError(t, err)
+	nonceTx := mockNonceTx(t, loom.Address{ChainID: chainID, Local: foreignLocalAddr}, sequence)
 
 	signedTx := auth.SignTx(signer, nonceTx)
 	marshalledSignedTx, err := proto.Marshal(signedTx)

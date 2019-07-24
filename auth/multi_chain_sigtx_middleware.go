@@ -42,7 +42,7 @@ var originRecoveryFuncs = map[SignedTxType]originRecoveryFunc{
 	LoomSignedTxType:     verifyEd25519,
 	EthereumSignedTxType: verifySolidity66Byte,
 	TronSignedTxType:     verifyTron,
-	BinanceSignedTxType:  verifyBinance,
+	BinanceSignedTxType:  verifySolidity66Byte,
 }
 
 type originRecoveryFunc func(tx SignedTx) ([]byte, error)
