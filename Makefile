@@ -198,7 +198,7 @@ $(TRANSFER_GATEWAY_DIR):
 	cd $(TRANSFER_GATEWAY_DIR) && git checkout master && git pull && git checkout $(TG_GIT_REV)
 
 $(BINANCE_TGORACLE_DIR):
-	git clone -q git@github.com:loomnetwork/binace-tgoracle.git $@
+	git clone -q git@github.com:loomnetwork/binance-tgoracle.git $@
 	cd $(BINANCE_TGORACLE_DIR) && git checkout master && git pull && git checkout $(BINANCE_TG_GIT_REV)
 
 validators-tool: $(TRANSFER_GATEWAY_DIR)
