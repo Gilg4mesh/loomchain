@@ -30,7 +30,7 @@ BINANCE_TGORACLE_DIR=$(GOPATH)/src/$(PKG_BINANCE_TGORACLE)
 #       specific commit.
 GO_LOOM_GIT_REV = binance-chain-signer
 # Specifies the loomnetwork/transfer-gateway branch/revision to use.
-TG_GIT_REV = HEAD
+TG_GIT_REV = binance-chain-signer
 # loomnetwork/go-ethereum loomchain branch
 ETHEREUM_GIT_REV = 1fb6138d017a4309105d91f187c126cf979c93f9
 # use go-plugin we get 'timeout waiting for connection info' error
@@ -43,7 +43,7 @@ BTCD_GIT_REV = 7d2daa5bfef28c5e282571bc06416516936115ee
 # google.golang.org/genproto seems to be pulled in by the grpc package.
 GENPROTO_GIT_REV = b515fa19cec88c32f305a962f34ae60068947aea
 # Specifies the loomnetwork/binance-tgoracle branch/revision to use.
-BINANCE_TG_GIT_REV = init-build
+BINANCE_TG_GIT_REV = oracle-verify-token-creation
 # Lock down certusone/yubihsm-go revision
 YUBIHSM_REV = 0299fd5d703d2a576125b414abbe172eaec9f65e
 
