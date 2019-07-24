@@ -1,3 +1,5 @@
+// +build evm
+
 package main
 
 import (
@@ -7,8 +9,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	loom "github.com/loomnetwork/go-loom"
+	"github.com/loomnetwork/go-loom/auth"
 	amtypes "github.com/loomnetwork/go-loom/builtin/types/address_mapper"
 	"github.com/loomnetwork/go-loom/cli"
+	"github.com/loomnetwork/go-loom/common/evmcompat"
 	lcrypto "github.com/loomnetwork/go-loom/crypto"
 	"github.com/loomnetwork/loomchain/builtin/plugins/address_mapper"
 	"github.com/pkg/errors"
@@ -36,6 +40,7 @@ func AddIdentityMappingCmd() *cobra.Command {
 
 			var privkey *ecdsa.PrivateKey
 			var foreignLocalAddr loom.LocalAddress
+			var sigType = evmcompat.SignatureType_EIP712
 
 			switch strings.TrimSpace(chainId) {
 			case "eth":
@@ -56,14 +61,30 @@ func AddIdentityMappingCmd() *cobra.Command {
 				if err != nil {
 					return errors.Wrapf(err, "bad tron private key from file% v", args[1])
 				}
+			case "binance":
+				privkey, err = crypto.LoadECDSA(args[1])
+				if err != nil {
+					return errors.Wrapf(err, "read binance private key from file %v", args[1])
+				}
+				signer := auth.NewBinanceSigner(crypto.FromECDSA(privkey))
+				foreignLocalAddr, err = loom.LocalAddressFromHexString(evmcompat.BitcoinAddress(signer.PublicKey()).Hex())
+				if err != nil {
+					return errors.Wrapf(err, "bad binance private key from file %v", args[1])
+				}
+				sigType = evmcompat.SignatureType_BINANCE
 			}
 
 			foreignAddr := loom.Address{ChainID: chainId, Local: foreignLocalAddr}
-			mapping.To = foreignAddr.MarshalPB()
-			mapping.Signature, err = address_mapper.SignIdentityMapping(user, foreignAddr, privkey)
+			sig, err := address_mapper.SignIdentityMapping(user, foreignAddr, privkey)
 			if err != nil {
 				return errors.Wrapf(err, "sigining mapping with %s key", chainId)
 			}
+			typedSig := append(make([]byte, 0, 66), byte(sigType))
+			// sig is already prefixed with default EIP721 signature type
+			sig = append(typedSig, sig[1:]...)
+
+			mapping.To = foreignAddr.MarshalPB()
+			mapping.Signature = sig
 
 			err = cli.CallContractWithFlags(&callFlags, AddressMapperName, "AddIdentityMapping", &mapping, nil)
 			if err != nil {
