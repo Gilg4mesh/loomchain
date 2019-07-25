@@ -213,17 +213,16 @@ func verifySig(from, to loom.Address, chainID string, sig []byte) error {
 	return nil
 }
 
-func SignIdentityMapping(from, to loom.Address, key *ecdsa.PrivateKey) ([]byte, error) {
+func SignIdentityMapping(from, to loom.Address, key *ecdsa.PrivateKey, sigType evmcompat.SignatureType) ([]byte, error) {
 	hash := ssha.SoliditySHA3(
 		ssha.Address(common.BytesToAddress(from.Local)),
 		ssha.Address(common.BytesToAddress(to.Local)),
 	)
-	sig, err := evmcompat.SoliditySign(hash, key)
+	sig, err := evmcompat.GenerateTypedSig(hash, key, sigType)
 	if err != nil {
 		return nil, err
 	}
-	// Prefix the sig with a single byte indicating the sig type, in this case EIP712
-	return append(make([]byte, 1, 66), sig...), nil
+	return sig, nil
 }
 
 var Contract plugin.Contract = contract.MakePluginContract(&AddressMapper{})

@@ -215,7 +215,7 @@ func TestEthAddressMappingVerification(t *testing.T) {
 	require.Error(t, err)
 
 	// set up address mapping between eth and loom accounts
-	sig, err := address_mapper.SignIdentityMapping(addr1, ethPublicAddr, ethKey)
+	sig, err := address_mapper.SignIdentityMapping(addr1, ethPublicAddr, ethKey, evmcompat.SignatureType_EIP712)
 	require.NoError(t, err)
 	mapping := amtypes.AddressMapperAddIdentityMappingRequest{
 		From:      addr1.MarshalPB(),
@@ -278,11 +278,8 @@ func TestBinancesAddressMappingVerification(t *testing.T) {
 	require.Error(t, err)
 
 	// set up address mapping between eth and loom accounts
-	sig, err := address_mapper.SignIdentityMapping(addr1, foreignPublicAddr, privKey)
+	sig, err := address_mapper.SignIdentityMapping(addr1, foreignPublicAddr, privKey, evmcompat.SignatureType_BINANCE)
 	require.NoError(t, err)
-	// make sig type to binance
-	typedSig := append(make([]byte, 0, 66), byte(evmcompat.SignatureType_BINANCE))
-	sig = append(typedSig, sig[1:]...)
 	mapping := amtypes.AddressMapperAddIdentityMappingRequest{
 		From:      addr1.MarshalPB(),
 		To:        foreignPublicAddr.MarshalPB(),

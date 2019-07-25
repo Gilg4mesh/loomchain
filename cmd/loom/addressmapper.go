@@ -75,16 +75,11 @@ func AddIdentityMappingCmd() *cobra.Command {
 			}
 
 			foreignAddr := loom.Address{ChainID: chainId, Local: foreignLocalAddr}
-			sig, err := address_mapper.SignIdentityMapping(user, foreignAddr, privkey)
+			mapping.To = foreignAddr.MarshalPB()
+			mapping.Signature, err = address_mapper.SignIdentityMapping(user, foreignAddr, privkey, sigType)
 			if err != nil {
 				return errors.Wrapf(err, "sigining mapping with %s key", chainId)
 			}
-			typedSig := append(make([]byte, 0, 66), byte(sigType))
-			// sig is already prefixed with default EIP721 signature type
-			sig = append(typedSig, sig[1:]...)
-
-			mapping.To = foreignAddr.MarshalPB()
-			mapping.Signature = sig
 
 			err = cli.CallContractWithFlags(&callFlags, AddressMapperName, "AddIdentityMapping", &mapping, nil)
 			if err != nil {
