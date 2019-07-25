@@ -10,6 +10,8 @@ const (
 	TGCheckZeroAmount = "tg:check-zamt"
 	//Enables workaround for handling of ERC721 deposits in the Gateway contract
 	TGFixERC721Feature = "tg:fix-erc721"
+	// Enables Binance contract mapping that user can map DAppChain contract with Binance Token
+	TGBinanceContractMapping = "tg:binance-contract-mapping"
 	// Enables processing of txs via MultiChainSignatureTxMiddleware, there's a feature flag per
 	// allowed chain ID, e.g. auth:sigtx:default, auth:sigtx:eth
 	AuthSigTxFeaturePrefix = "auth:sigtx:"
